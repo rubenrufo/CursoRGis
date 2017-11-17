@@ -1,0 +1,152 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Preamble, include=FALSE}
+#---- Carrega llibreries ----
+library(sf)        # Alternativa a sp nova
+library(mapview)   # Per a mapes interactius
+library(ggplot2)   # Per a plotejar (juntament amb ggspatial)
+library(ggspatial)
+library(ggmap)     # Geocodificar (buscar en Google i altres)
+library(raster)    # Raster
+library(rasterVis) # Ploteja Raster (levelplot)
+```
+
+
+## Càrrega i primers plots
+
+```{r}
+countries <- st_read("data/eucountries.shp")  # or gpkg, etc
+head(countries)
+countries2 <- dplyr::select(countries, -gdp_md_est) #Eliminar una variable (dplyr)
+west.eu <- filter(countries, subregion == "Western Europe") #Filtrar part
+countries %>%
+  group_by(subregion) %>%
+  summarise(mean(pop_est))  # Agrupar per subregion
+
+countries <- mutate(countries, pop.million = pop_est/1000000)  # Crear nuevas columnas
+
+plot(countries) 
+
+mapView(countries)   
+```
+
+
+## Crear sf desde un objecte R
+
+Per a buscar projeccions: http://spatialreference.org
+Estos en coordenadas geográficas latitud longitud
+
+```{r}
+mydf <- read.csv("data/occs.csv")   # Carreguem un data.frame amb latitud i longitud
+head(mydf)
+
+occs <- st_as_sf(mydf, coords = c("x", "y"))  # Convertir objecte (something) a sf
+head(occs)  # Posa NA en epsg perque n o sap quina projecció és
+
+st_crs(occs) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"   # Li informem de la projecció. Jum...
+```
+
+
+## Canviar projecció
+
+```{r}
+occs.laea <- st_transform(occs, crs = 3035)  # Reprojecte a Europea de Referència 
+occs.laea
+mapView(occs.laea)
+```
+
+
+## Spatial object
+
+```{r}
+occs.sp <- as(occs, "Spatial")  # Pasar a Spatial
+
+ggplot() + coord_map() +    # Plotear amb ggplot i ggspatial
+  geom_spatial(occs.sp) 
+
+ggplot() + coord_map() +    # Amb geografia
+  geom_osm() +
+  geom_spatial(occs.sp)
+
+ggplot() + coord_map() +
+  geom_osm(type = "stamenwatercolor") +  # Amb aquarela
+  geom_spatial(occs.sp)
+
+countries.sp <- as(countries, "Spatial")
+ggplot() + theme_bw() +
+  geom_spatial(countries.sp, aes(fill = subregion))
+
+```
+
+
+
+
+
+## Guardar Vectorial
+
+
+```{r}
+st_write(countries, "data/countries.gpkg", delete_dsn = TRUE)
+```
+
+
+## Geocoding
+
+```{r}
+library(ggmap)
+
+here <- geocode("Alcora", source="google")
+
+```
+
+
+
+
+
+## Raster
+
+Per ara funciona amb sp, no sf
+
+- Layer (una capa)
+- Stack (moltes)
+- Brick (moltes, 1 file)
+
+
+```{r}
+library(raster)
+bioclim <- getData('worldclim', var = "bio", res = 10)  # Baixa de wordclim (una pàgina web). Mirar Barcelona supercomputing per a clima amb temporal
+
+ras <- raster("wc10/bio1.bil") # Una sola capa
+
+files <- list.files("wc10", pattern = "bio\\d+.bil", full.names = TRUE)                        # Carregue varios arxius
+manylayers <- stack(files)   # Acumule varios arxius en un Stack
+crs(ras) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"  # Projeccio long latit més extés
+
+plot(ras)
+mapView(ras)
+levelplot(ras/10, margin = FALSE) # Amb rasterVis
+
+ras.crop <- crop(ras, occs.sp)    # Retalle ras per on estan els punts de occs.sp (sols funciona amb sp, no amb sf, crec, per ara)
+plot(ras.crop)
+levelplot(ras.crop, margin=FALSE)
+
+ras.coarse <- aggregate(ras.crop, fact = 4, fun = mean) # Canviar resolució
+
+vals <- extract(ras, occs.sp)         # Te pasa les dades del raster ras als punts de occs.sp
+vals <- extract(manylayers, occs.sp)  # Te pasa les dades dels rasters ras als punts de occs.sp
+
+
+writeRaster(ras, filename = "myraster.grd")  # Guardar rasters
+KML(ras, filename = "myraster.kmz", overwrite = TRUE)  # Guardar Google Earth
+
+```
+
+

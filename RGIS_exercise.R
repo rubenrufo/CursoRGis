@@ -9,19 +9,19 @@ str(spdata,1)
 library(sp)
 coordinates(spdata) <- c("decimalLongitude", "decimalLatitude")
 
-## set projection (CRS)
+## set projection (CRS) # Posem a latitud i longitud
 library(raster)
 projection(spdata) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
 
 
 ## plot localities
-library(dismo)
+library(dismo)                   # Per a mapa google map 
 plot(gmap(spdata, type = "satellite"))
 points(Mercator(spdata), col = "orange", pch = 20, cex = 3)
 
 
-## mapr
-library(mapr)
+## mapr 
+library(mapr)                   # També google map però diferent
 map_ggmap(spdata, lon = "decimalLongitude", lat = "decimalLatitude")
 
 
@@ -32,13 +32,13 @@ mapView(spdata)
 
 ## subset
 
-## rasterize and plot
+## rasterize and plot # ??
 
 p <- rasterize()
 
 
 
-## digitalizar
+## digitalizar # ??
 newlocs <- click(n = 2)
 newpoly <- drawPoly()
 
